@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "inoproshop": {
+      "command": "cmd",
+      "args": [
+        "/c", "C:\\Users\\iouli\\Desktop\\plc\\inoproshop-mcp\\start-mcp.cmd",
+        "--no-auto-launch"
+      ]
+    }
+  }
+}

@@ -1,0 +1,16 @@
+# Dependencies
+node_modules/
+
+# Build output (rebuild with `npm run build`)
+dist/
+
+# Logs & temp
+*.log
+logs/
+tmp/
+.DS_Store
+Thumbs.db
+
+# Environment / local secrets
+.env
+.env.*
