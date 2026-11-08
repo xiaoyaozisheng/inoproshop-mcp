@@ -47,9 +47,10 @@ Get-ChildItem 'C:\Inovance Control\InoProShop\CODESYS\Profiles' -Filter *.profil
 
 **2. Node.js ≥ 18 是前置条件 —— 先 `node -v` 确认。**
 
-很多机器上压根没装 Node（本包初次接手的那台机器就没有）。0.7.2 起包里**自带完整
-`src/`、`tests/` 和已构建好的 `dist/`**，开箱即可 `node dist/bin.js`（或走 `start-mcp.cmd`），
-**不需要先构建**；只有改了 `src/` 源码才需要：
+很多机器上压根没装 Node（本包初次接手的那台机器就没有）。**分发包**自带完整
+`src/`、`tests/` 和已构建好的 `dist/`，开箱即可 `node dist/bin.js`（或走 `start-mcp.cmd`），
+**不需要先构建**；但 `dist/` 不入 git（构建产物），**从 git 克隆的必须先跑一次
+`npm run build`**；之后只有改了 `src/` 源码才需要重新构建：
 
 ```bash
 cd <本包目录>
