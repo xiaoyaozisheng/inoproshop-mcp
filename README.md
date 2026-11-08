@@ -1,5 +1,9 @@
 # InoProShop MCP —— 汇川 AM/中型 PLC 程序化编程接口
 
+[![CI](https://github.com/xiaoyaozisheng/inoproshop-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/xiaoyaozisheng/inoproshop-mcp/actions/workflows/ci.yml)
+
+**简体中文** | [English](README.en.md)
+
 这是一个打包好的 MCP（Model Context Protocol）服务器，用来**程序化读写 InoProShop**（汇川 AM/中型 PLC，CoDeSys SP11 内核）的代码。
 
 > 📌 **另有 [`SKILL.md`](SKILL.md)：实战踩坑沉淀**（编译消息漏扫 Build 类别 / `/* */` 注释不支持 /
@@ -15,6 +19,7 @@
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | **架构说明**：模块职责、一条命令的完整旅程、设计决策 |
 | [SKILL.md](SKILL.md) | 实战踩坑沉淀（判据 + 可照抄的修法） |
 | [CHANGELOG.md](CHANGELOG.md) | 变更记录（含验证证据） |
+| [SECURITY.md](SECURITY.md) | 安全策略 / 漏洞报告渠道 |
 
 ---
 

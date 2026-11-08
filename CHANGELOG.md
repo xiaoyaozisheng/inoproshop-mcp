@@ -50,6 +50,9 @@
 - 新增 `docs/` 说明书三份：`TOOLS.md`（41 工具 + 3 资源 + CLI 参数 + 环境变量的参数级手册，
   参数全部从 `src/server.ts` 提取核对）、`TROUBLESHOOTING.md`（按报错原文索引的排查手册）、
   `ARCHITECTURE.md`（模块职责、IPC 数据流、设计决策）。
+- **开源配套**：新增 `SECURITY.md`（漏洞报告渠道 + 本项目风险面说明）、GitHub Actions CI
+  （`ci.yml`：ubuntu/windows × node 18/20 矩阵，`npm ci` + build + 39 用例，README 挂徽章）、
+  英文版 `README.en.md`（与中文 README 同构，其余文档保持中文）。
 
 ## 0.7.1
 
