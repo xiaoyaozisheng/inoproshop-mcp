@@ -47,6 +47,9 @@
   `INOPROSHOP_PROJECT` 环境变量 + 包目录自解析 + `lib-profile.mjs` 自动探测；
   `verify-*` 两个自检脚本的 profile 回退值也改为自动探测。7 个脚本 `node --check` 全过。
 - `package.json` 版本号 0.7.1 → 0.7.2。
+- 新增 `docs/` 说明书三份：`TOOLS.md`（41 工具 + 3 资源 + CLI 参数 + 环境变量的参数级手册，
+  参数全部从 `src/server.ts` 提取核对）、`TROUBLESHOOTING.md`（按报错原文索引的排查手册）、
+  `ARCHITECTURE.md`（模块职责、IPC 数据流、设计决策）。
 
 ## 0.7.1
 

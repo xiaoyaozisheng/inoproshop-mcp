@@ -4,6 +4,10 @@
 > 全部内容都在真机上实测过：**InoProShop V1.9.0.1（CODESYS V3.5 SP11 内核）**，
 > 工程 `C:\Users\Administrator\Desktop\测试\PLC程序\未命名4\未命名4.project`。
 > 记录时间：2026-09-21。
+>
+> **0.7.2 更新（2026-11-08）**：① `eval_python` **默认禁用**（见 §0），本文两处靠它的流程
+> 要加 `--allow-eval` 才能照抄；② profile 名**因机器而异**，`start-mcp.cmd` 已改为自动探测，
+> 别抄任何文档里的版本号；③ `src/`、`tests/` 已恢复入包，改脚本请改 `src/scripts/` 再构建。
 
 ---
 
@@ -18,6 +22,31 @@
 
 ---
 
+## 0. 🟠 0.7.2 起 `eval_python` 默认禁用（本文两处流程受影响）
+
+### 现象
+```
+eval_python → isError: "eval_python is disabled by default because it executes arbitrary
+IronPython inside the IDE. Restart the server with --allow-eval to enable it."
+```
+**这不是坏了，是新门控**（任意代码执行面太大，见 CHANGELOG 0.7.2）。启动日志里也会印一行
+`eval_python: disabled (start with --allow-eval to enable)`。
+
+### 受影响的照抄段落
+| 位置 | 流程 | 不开门控的替代 |
+|---|---|---|
+| §1 | 编译消息取证（`se.system.get_message_objects(BUILD_GUID)`） | 直接用 `get_compile_messages` —— 0.7.1 已把同等逻辑内置为该工具的主通道 |
+| §3 | `pou.create_action(name)` 建 ACT | IDE 里手动右键 New Action；建完正文仍可用 `set_pou_code` 写入 |
+
+### ✅ 开法
+启动命令追加 `--allow-eval`。`.mcp.json` 里写法：
+```json
+"args": [ "/c", "…\\start-mcp.cmd", "--no-auto-launch", "--allow-eval" ]
+```
+用 `start-mcp.cmd` 手跑就直接 `start-mcp.cmd --allow-eval`。
+
+---
+
 ## 1. 🔴 `compile_project` 说"编译 0 条消息"≠ 编译通过
 
 ### 现象
@@ -28,7 +57,7 @@ get_compile_messages → "No compile messages found. The message API may not be 
 **看起来一切正常，实际上当时工程里有 288 条 Error。**
 
 ### 根因
-本机 `scriptengine.system.get_message_categories()` 返回 **3 个**类别，而 `dist/scripts/compile_project.py`
+本机 `scriptengine.system.get_message_categories()` 返回 **3 个**类别，而 `compile_project.py`
 只扫了枚举结果的前 2 个：
 
 | guid | 类别 | 本包扫了吗 |
@@ -60,7 +89,9 @@ time.sleep(1.5)        # 等消息落定
 for m in se.system.get_message_objects(BUILD_GUID):   # ★ 必须走 system，不是 app
     print(m.severity, m.text)
 ```
-调用方式：`tools/call` → `eval_python`，把上面整段当 `code` 传进去。
+调用方式：`tools/call` → `eval_python`，把上面整段当 `code` 传进去
+（**0.7.2 起需先加 `--allow-eval`**，见 §0；不开门控就直接用 `get_compile_messages`，
+主通道就是这段逻辑的内置版）。
 
 ### 三个会白折腾的细节
 1. **`app.get_message_objects(...)` 不存在** —— `App` 是 `ScriptObject`，没这个方法，
@@ -87,7 +118,7 @@ for m in se.system.get_message_objects(BUILD_GUID):   # ★ 必须走 system，�
 
 **改了两个脚本**：
 
-**① `dist/scripts/compile_project.py`** —— 把硬编码的编译类别**无条件并入**扫描列表（原来只当"枚举失败时的兜底"，
+**① `src/scripts/compile_project.py`**（构建后同步到 `dist/scripts/`）—— 把硬编码的编译类别**无条件并入**扫描列表（原来只当"枚举失败时的兜底"，
 而枚举非空就永远轮不到它）；并新增两行**可判断的结论输出**：
 
 ```
@@ -104,13 +135,13 @@ BUILD SUMMARY: 构建完成--0错误,0警告：准备下载!                    
 > ⚠️ 匹配"构建完成"用的是 `u'\u6784\u5efa\u5b8c\u6210'` 转义，
 > 因为 **IronPython 2.7 不接受无编码声明的非 ASCII 源码**，补丁必须保持纯 ASCII。
 
-**② `dist/scripts/get_compile_messages.py`** —— 新增 **Pattern 0（主通道，已验证）**：
+**② `src/scripts/get_compile_messages.py`**（构建后同步到 `dist/scripts/`）—— 新增 **Pattern 0（主通道，已验证）**：
 枚举类别（并合并硬编码的三个编译 GUID）→ 逐个 `script_engine.system.get_message_objects(guid)`。
 原来的三种猜测全部让位：`app.get_message_objects()` 方法不存在，
 `system.get_message_objects()` **不传类别恒返回 0** —— 这就是它以前永远答
 `No compile messages found.` 的原因。
 
-**③ `package.json` 版本 → `0.7.1`**（见 `CHANGELOG.md`）。
+**③ `package.json` 版本 → `0.7.1`**（见 `CHANGELOG.md`；当前版本已是 **0.7.2**）。
 
 #### 验证证据（真机、同工程）
 
@@ -177,6 +208,9 @@ pou.create_action('ACT_01_初始化')       # 一行一个，1 个参数就够
 proj.save()
 ```
 **判据**：`pou.get_children(False)` 里能看到全部 ACT 名字（实测 13/13 成功）。
+
+> ⚠️ `eval_python` 0.7.2 起默认禁用 —— 启动加 `--allow-eval` 再照抄这段（见 §0）；
+> 不开门控就在 IDE 里手动建 ACT，建完正文仍走 `set_pou_code` 写入。
 
 ### 把正文写进 ACT —— 用现成的 `set_pou_code` 就行
 `pouPath` 直接写路径，**不需要新工具**：
@@ -273,7 +307,7 @@ END_VAR
 
 | | ACT（Action） | Method |
 |---|---|---|
-| 建法 | **没有工具** ⇒ `eval_python` 调 `pou.create_action(name)` | **有工具** `create_method` |
+| 建法 | **没有工具** ⇒ `eval_python` 调 `pou.create_action(name)`（需 `--allow-eval`，见 §0） | **有工具** `create_method` |
 | 声明区 | **无** —— 共享 POU 的声明区，自己不能声明变量 | **有自己的**（但必须带 `METHOD` 头） |
 | 局部变量 | ❌ 只能全写到 POU 声明区 | ✅ 可以有 |
 | 返回类型 | ❌ | ✅ |

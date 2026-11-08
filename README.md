@@ -3,7 +3,18 @@
 这是一个打包好的 MCP（Model Context Protocol）服务器，用来**程序化读写 InoProShop**（汇川 AM/中型 PLC，CoDeSys SP11 内核）的代码。
 
 > 📌 **另有 [`SKILL.md`](SKILL.md)：实战踩坑沉淀**（编译消息漏扫 Build 类别 / `/* */` 注释不支持 /
-> ACT 与 Method 的建法与差异）—— **动手前建议与本文一并读**，那几个坑都会让你误判"一切正常"。
+> ACT 与 Method 的建法与差异 / `eval_python` 默认禁用）—— **动手前建议与本文一并读**，那几个坑都会让你误判"一切正常"。
+
+## 📚 文档导航
+
+| 文档 | 内容 |
+|---|---|
+| **README.md**（本文） | 总览、快速上手、环境与配置 |
+| [docs/TOOLS.md](docs/TOOLS.md) | **工具参考手册**：41 个 tool + 3 个 resource 的参数级说明、CLI 参数、环境变量 |
+| [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | **故障排查手册**：按报错原文索引"原因 → 处理" |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | **架构说明**：模块职责、一条命令的完整旅程、设计决策 |
+| [SKILL.md](SKILL.md) | 实战踩坑沉淀（判据 + 可照抄的修法） |
+| [CHANGELOG.md](CHANGELOG.md) | 变更记录（含验证证据） |
 
 ---
 
@@ -28,21 +39,23 @@ Get-ChildItem 'C:\Inovance Control\InoProShop\CODESYS\Profiles' -Filter *.profil
 > `CODESYS V3.5 SP11 Patch 1.profile`，**根本没有 V1.10.0.3**。
 > 而且用 `InoProShop(V1.9.0.1)` 跑通了完整闭环（拉起 IDE → 开工程 → 建 GVL →
 > 改 POU → 保存 → 关机）。
-> ⇒ **本机正确值 = `InoProShop(V1.9.0.1)`**，`start-mcp.cmd` 与 `.mcp.json` 都已按此更正。
+> ⇒ **本机正确值 = `InoProShop(V1.9.0.1)`**。0.7.2 起 `start-mcp.cmd` 会**自动探测** profile，
+> `.mcp.json` 已改为调用 `start-mcp.cmd`（配置里不再写版本号）。
 >
 > ⚠️ 若之后装了 V1.10.0.3 那个完整包，profile 名会变 —— **再列一次目录**即可。
 > 判据永远是 `Profiles` 目录，不是任何文档。
 
-**2. 本包必须先 `npm run build`，`dist/` 里才会有可执行的 JS。**
+**2. Node.js ≥ 18 是前置条件 —— 先 `node -v` 确认。**
 
-仓库里 `dist/` 初始**只带 `dist/scripts/*.py`**（给 IronPython 用的脚本），**没有任何编译产物**。
-不构建就直接 `node dist/bin.js` 会立刻报"找不到文件"。前置条件是 **Node.js ≥ 18** —— 先 `node -v` 确认，
-很多机器上压根没装（本机初次接手时就没有）。
+很多机器上压根没装 Node（本包初次接手的那台机器就没有）。0.7.2 起包里**自带完整
+`src/`、`tests/` 和已构建好的 `dist/`**，开箱即可 `node dist/bin.js`（或走 `start-mcp.cmd`），
+**不需要先构建**；只有改了 `src/` 源码才需要：
 
 ```bash
 cd <本包目录>
 npm install
 npm run build        # tsc 编译 + 拷贝 src/scripts -> dist/scripts
+npm test             # 39 个用例（单元 + 脚本模板集成），改完源码建议跑一遍
 ```
 
 **3. 改了 `src/scripts/watcher.py`，必须重启 InoProShop 才生效。**
@@ -79,7 +92,8 @@ watcher.py 是 IDE 启动时通过 `--runscript` 载入的，运行期间替换�
   这两个脚本在本机实测分别是 **11/11** 和 **13/13** 通过。
 
 - **`test-luke.mjs` / `write-cylinder.mjs` / `write-cylinder-fb.mjs` / `write-vacuum.mjs`**
-  是历史示例，`PROJECT` 是**写死的占位符**，跑之前必须改成真实存在的工程，否则必然失败。
+  是历史示例（0.7.2 起同样从环境变量读工程路径、自动探测 profile、按脚本位置定位包目录），
+  不设 `INOPROSHOP_PROJECT` 会直接报错退出，不会误写别的工程。
 
 ---
 
@@ -91,7 +105,7 @@ watcher.py 是 IDE 启动时通过 `--runscript` 载入的，运行期间替换�
 |---|---|
 | `dist/server.js` | 服务端实现（`package.json` 的 `main`，约 85 KB） |
 | `dist/bin.js` | CLI 入口（`package.json` 的 `bin`）—— **客户端实际 spawn 的就是它** |
-| `start-mcp.cmd` | 根目录启动器：自动带上 exe / profile / `--mode persistent`，并先检查 node 和 `dist/` |
+| `start-mcp.cmd` | 根目录启动器：自动探测 profile、带上 exe / `--mode persistent`，先过 node / `dist/` / exe / profile 四道检查 |
 
 自检（都是亚秒级）：
 
@@ -115,13 +129,17 @@ spawn 一个子进程、用 stdin/stdout 说 JSON-RPC。所以：
 不加 `--no-auto-launch` 时，服务端启动后会**自动拉起 InoProShop**；如果已经有活着的
 实例，它会**接管**（stderr 出现 `Adopting existing session`），不会重复拉起。
 
-启动器内置三道快速失败，避免"莫名挂起"：
+启动器内置四道快速失败，避免"莫名挂起"：
 
 | 情况 | 行为 |
 |---|---|
 | 找不到 `node` | 提示装 Node ≥ 18，`exit 2` |
 | `dist/bin.js` 不存在 | 提示先 `npm run build`，`exit 3` |
-| profile 不存在 | 列出实际可用 profile，`exit 2` |
+| `InoProShop.exe` 不存在 | 提示用 `--codesys-path` 指实际位置，`exit 2` |
+| Profiles 目录里没有 `*.profile` | 提示安装或显式传 `--codesys-profile`，`exit 2` |
+
+> 另有一道兜底：即使绕过启动器直接 `node dist/bin.js` 传错 profile，
+> `bin.js` 启动时的 `assertProfileExists` 也会列出实际可用值并 `exit 2`。
 
 > **DSH 桌面端本身不带 MCP 客户端能力**（base bundle 的依赖里没有任何 MCP 插件），
 > 它不读 `.mcp.json`。`.mcp.json` 是给 Claude Code / Cursor / Windsurf 这类客户端用的，
@@ -141,6 +159,8 @@ spawn 一个子进程、用 stdin/stdout 说 JSON-RPC。所以：
 - **UI 保持可交互**：后台线程轮询命令，主线程执行，脚本返回后 IDE 不会卡死。
 - **自动接管**：MCP 服务器重启后会自动接管已运行的 InoProShop 实例，不用重启 IDE。
 - **已打中文补丁**：中文路径、中文注释、中文变量名全部支持（见第五节）。
+- **源码与测试入包**（0.7.2）：`src/` + `tests/` 齐全，`npm test` 39 个用例；
+  `eval_python` 默认禁用（加 `--allow-eval` 开启）。
 
 ## 二、环境要求
 
@@ -165,7 +185,7 @@ node dist/bin.js \
 ## 四、接入 MCP 客户端（Claude Code 等）
 
 在项目根目录放一个 `.mcp.json`，让它调用 `start-mcp.cmd`（profile 自动探测、
-exe / dist / node 三道快速失败都内置在启动器里，拷到别的机器**只需改这一个路径**）：
+exe / dist / node / profile 四道快速失败都内置在启动器里，拷到别的机器**只需改这一个路径**）：
 
 ```json
 {
@@ -292,4 +312,5 @@ exe / dist / node 三道快速失败都内置在启动器里，拷到别的机�
 ```bash
 npm install
 npm run build   # tsc 编译 + 拷贝 src/scripts -> dist/scripts
+npm test        # 39 个用例（vitest）：3 个单元测试文件 + 1 个脚本模板集成
 ```
