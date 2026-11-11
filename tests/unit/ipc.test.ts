@@ -3,9 +3,9 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { spawn, ChildProcess } from 'child_process';
-import { IpcClient, DEFAULT_IPC_CONFIG } from '../../src/ipc';
+import { IpcClient, DEFAULT_IPC_CONFIG } from '../../src/030_Infrastructure/FB_IpcClient';
 
-const TEST_BASE = path.join(os.tmpdir(), 'codesys-mcp-test-ipc');
+const TEST_BASE = path.join(os.tmpdir(), 'tia-mcp-test-ipc');
 
 function createTestIpcDir(): string {
   const dir = path.join(TEST_BASE, `test-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
@@ -14,8 +14,8 @@ function createTestIpcDir(): string {
 }
 
 function spawnMockWatcher(ipcDir: string): ChildProcess {
-  const mockWatcherPath = path.join(__dirname, '..', 'mock_watcher.py');
-  const child = spawn('python', [mockWatcherPath, '--ipc-dir', ipcDir], {
+  const mockWatcherPath = path.join(__dirname, '..', 'mock_watcher.js');
+  const child = spawn('node', [mockWatcherPath, '--ipc-dir', ipcDir], {
     stdio: ['pipe', 'pipe', 'pipe'],
   });
   return child;
@@ -97,39 +97,29 @@ describe('IpcClient', () => {
       } catch { /* ignore */ }
     });
 
-    it('sendCommand roundtrip - print Hello World', async () => {
-      const result = await client.sendCommand('print("Hello World")');
+    it('sendCommand roundtrip - echo payload with success', async () => {
+      const result = await client.sendCommand('SCRIPT_SUCCESS: Hello World');
       expect(result.success).toBe(true);
       expect(result.output).toContain('Hello World');
     });
 
-    it('sendCommand handles script error', async () => {
-      const result = await client.sendCommand('raise Exception("test error")');
+    it('sendCommand handles SCRIPT_ERROR marker', async () => {
+      const result = await client.sendCommand('SCRIPT_ERROR: test error');
       expect(result.success).toBe(false);
-      expect(result.error).toContain('test error');
+      expect(result.error).toContain('SCRIPT_ERROR');
     });
 
-    it('sendCommand handles SystemExit(0) as success', async () => {
-      const result = await client.sendCommand('import sys; sys.exit(0)');
-      expect(result.success).toBe(true);
-    });
-
-    it('sendCommand handles SystemExit(1) as failure', async () => {
-      const result = await client.sendCommand('import sys; sys.exit(1)');
-      expect(result.success).toBe(false);
-    });
-
-    it('namespace isolation between commands', async () => {
-      const result1 = await client.sendCommand('x = 42\nprint("set x")');
-      expect(result1.success).toBe(true);
-      expect(result1.output).toContain('set x');
-
-      const result2 = await client.sendCommand('print(x)');
-      expect(result2.success).toBe(false); // x not defined in fresh namespace
+    it('command files are cleaned up after processing', async () => {
+      await client.sendCommand('SCRIPT_SUCCESS: cleanup check');
+      const commands = fs.existsSync(path.join(ipcDir, 'commands'))
+        ? fs.readdirSync(path.join(ipcDir, 'commands')).filter((f) => f.endsWith('.command.json'))
+        : [];
+      expect(commands.length).toBe(0);
     });
 
     it('large output - 100KB of text', async () => {
-      const script = 'print("A" * 102400)';
+      const payload = 'A'.repeat(102400);
+      const script = `SCRIPT_SUCCESS\n${payload}`;
       const result = await client.sendCommand(script);
       expect(result.success).toBe(true);
       expect(result.output.length).toBeGreaterThanOrEqual(102400);
@@ -137,8 +127,8 @@ describe('IpcClient', () => {
 
     it('serialization - concurrent commands execute sequentially', async () => {
       // Send two commands concurrently
-      const p1 = client.sendCommand('import time; time.sleep(0.1); print("first")');
-      const p2 = client.sendCommand('print("second")');
+      const p1 = client.sendCommand('SCRIPT_SUCCESS: first');
+      const p2 = client.sendCommand('SCRIPT_SUCCESS: second');
 
       const [r1, r2] = await Promise.all([p1, p2]);
       expect(r1.success).toBe(true);
@@ -150,14 +140,9 @@ describe('IpcClient', () => {
     });
 
     it('SCRIPT_SUCCESS marker in output', async () => {
-      const result = await client.sendCommand('print("SCRIPT_SUCCESS: done")');
+      const result = await client.sendCommand('SCRIPT_SUCCESS: done');
       expect(result.success).toBe(true);
       expect(result.output).toContain('SCRIPT_SUCCESS');
-    });
-
-    it('SCRIPT_ERROR marker in output', async () => {
-      const result = await client.sendCommand('print("SCRIPT_ERROR: something went wrong")');
-      expect(result.success).toBe(false);
     });
   });
 
@@ -170,7 +155,7 @@ describe('IpcClient', () => {
     });
 
     await expect(
-      shortTimeoutClient.sendCommand('print("hello")')
+      shortTimeoutClient.sendCommand('SCRIPT_SUCCESS: hello')
     ).rejects.toThrow(/timed out/);
   });
 });

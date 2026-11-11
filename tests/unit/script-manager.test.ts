@@ -1,15 +1,15 @@
 import { describe, it, expect } from 'vitest';
 import * as path from 'path';
-import { ScriptManager } from '../../src/script-manager';
+import { ScriptManager } from '../../src/040_Services/FB_ScriptManager';
 
-const SCRIPTS_DIR = path.join(__dirname, '..', '..', 'src', 'scripts');
+const SCRIPTS_DIR = path.join(__dirname, '..', '..', 'src', '090_Scripts');
 
 describe('ScriptManager', () => {
   const mgr = new ScriptManager(SCRIPTS_DIR);
 
   it('loads an existing template', () => {
     const content = mgr.loadTemplate('check_status');
-    expect(content).toContain('scriptengine');
+    expect(content).toContain('TIA Portal');
     expect(content).toContain('SCRIPT_SUCCESS');
   });
 
@@ -22,40 +22,31 @@ describe('ScriptManager', () => {
     expect(result).toBe('hello bar');
   });
 
-  it('Python-escapes backslashes for regular string templates', () => {
-    const result = mgr.interpolate('path = "{PATH}"', {
+  it('leaves backslashes untouched (PS single-quoted literals are raw)', () => {
+    const result = mgr.interpolate("path = '{PATH}'", {
       PATH: 'C:\\Users\\Test',
     });
-    // Each \ becomes \\ in source so Python decodes it back to a single \.
-    expect(result).toBe('path = "C:\\\\Users\\\\Test"');
+    expect(result).toBe("path = 'C:\\Users\\Test'");
   });
 
-  it('Python-escapes triple quotes (single " each, safe in triple-quoted)', () => {
-    const result = mgr.interpolate('code = """{CODE}"""', {
-      CODE: 'a """ b',
-    });
-    // Each " is escaped to \" - safe in both regular and triple-quoted strings.
-    expect(result).toBe('code = """a \\"\\"\\" b"""');
+  it('doubles single quotes (PowerShell escaping)', () => {
+    const result = mgr.interpolate("s = '{S}'", { S: "it's" });
+    expect(result).toBe("s = 'it''s'");
   });
 
-  it('escapes single quotes', () => {
-    const result = mgr.interpolate('s = "{S}"', { S: "it's" });
-    expect(result).toBe('s = "it\\\'s"');
-  });
-
-  it('escapes newlines so source stays single-line per template line', () => {
-    const result = mgr.interpolate('s = "{S}"', { S: 'line1\nline2' });
-    expect(result).toBe('s = "line1\\nline2"');
+  it('leaves newlines literal (valid inside PS single-quoted strings)', () => {
+    const result = mgr.interpolate("s = '{S}'", { S: 'line1\nline2' });
+    expect(result).toBe("s = 'line1\nline2'");
   });
 
   it('{KEY:raw} bypasses escaping for code-block embedding', () => {
-    const result = mgr.interpolate('code = {C:raw}', { C: 'print("hi")' });
-    expect(result).toBe('code = print("hi")');
+    const result = mgr.interpolate('code = {C:raw}', { C: 'Write-Log "hi"' });
+    expect(result).toBe('code = Write-Log "hi"');
   });
 
   it('does not interpret $ in value as a regex backref', () => {
-    const result = mgr.interpolate('s = "{S}"', { S: '$&' });
-    expect(result).toBe('s = "$&"');
+    const result = mgr.interpolate("s = '{S}'", { S: '$&' });
+    expect(result).toBe("s = '$&'");
   });
 
   it('interpolates multiple params', () => {
@@ -64,8 +55,6 @@ describe('ScriptManager', () => {
   });
 
   it('two reads of the same template return identical content', () => {
-    // The cache was removed in 0.6.1; loadTemplate now reads from disk every
-    // call. This test asserts content stability, not reference equality.
     const first = mgr.loadTemplate('check_status');
     const second = mgr.loadTemplate('check_status');
     expect(first).toEqual(second);
@@ -76,24 +65,22 @@ describe('ScriptManager', () => {
     expect(result).toBe('script1\n\nscript2\n\nscript3');
   });
 
-  it('prepareScript loads and interpolates with Python escape', () => {
+  it('prepareScript loads and interpolates with raw Windows paths', () => {
     const result = mgr.prepareScript('create_project', {
-      PROJECT_FILE_PATH: 'C:\\Projects\\test.project',
-      TEMPLATE_PROJECT_PATH: 'C:\\Templates\\Standard.project',
+      PROJECT_FILE_PATH: 'C:\\Projects\\MyProject',
     });
-    // Backslashes are escaped for embedding in regular Python string literals.
-    expect(result).toContain('C:\\\\Projects\\\\test.project');
-    expect(result).toContain('C:\\\\Templates\\\\Standard.project');
+    // PowerShell single-quote embedding keeps backslashes as written.
+    expect(result).toContain("'{PROJECT...}'".replace('{PROJECT...}', 'C:\\Projects\\MyProject'));
   });
 
   it('prepareScriptWithHelpers prepends helpers', () => {
     const result = mgr.prepareScriptWithHelpers(
       'open_project',
-      { PROJECT_FILE_PATH: 'C:\\test.project' },
+      { PROJECT_FILE_PATH: 'C:\\test.ap17' },
       ['ensure_project_open']
     );
-    // ensure_project_open content should appear before open_project content
-    const ensureIdx = result.indexOf('def ensure_project_open');
+    // ensure_project_open function should appear before open_project body
+    const ensureIdx = result.indexOf('function Ensure-ProjectOpen');
     const openIdx = result.indexOf('Project Opened');
     expect(ensureIdx).toBeGreaterThan(-1);
     expect(openIdx).toBeGreaterThan(-1);
@@ -101,10 +88,10 @@ describe('ScriptManager', () => {
   });
 
   it('Windows path with spaces passes through correctly', () => {
-    const result = mgr.interpolate('path = "{PATH}"', {
-      PATH: 'C:\\Program Files\\CODESYS',
+    const result = mgr.interpolate("path = '{PATH}'", {
+      PATH: 'C:\\Program Files\\Siemens\\Automation',
     });
-    // Backslashes escaped, spaces unchanged.
-    expect(result).toBe('path = "C:\\\\Program Files\\\\CODESYS"');
+    // Backslashes unchanged, spaces unchanged.
+    expect(result).toBe("path = 'C:\\Program Files\\Siemens\\Automation'");
   });
 });

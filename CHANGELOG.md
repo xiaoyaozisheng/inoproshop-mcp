@@ -1,8 +1,82 @@
 # 变更记录
 
-本包是 [luke-harriman/Codesys-MCP](https://github.com/luke-harriman/Codesys-MCP) 的 **InoProShop 改造版**。
+本包是 [luke-harriman/Codesys-MCP](https://github.com/luke-harriman/Codesys-MCP) 的改造版，
+演进路径：**上游 CODESYS 版 → 汇川 InoProShop 版（0.7.x）→ 西门子 TIA Portal 版（tia-portal-mcp）**。
 
-> ⚠️ **本包已与上游分叉。** 不要用上游的 README、示例或 profile 版本号覆盖本地文件。
+> ⚠️ **本包已与上游分叉。** 不要用上游的 README、示例或配置覆盖本地文件。
+
+---
+
+## 未发布 —— 西门子 TIA Portal 版（`codesys-mcp-persistent` → `tia-portal-mcp`）
+
+本轮包含两个先后阶段：**① 西门子模板风格的代码组织重构**（接口不变），
+**② 执行后端从汇川 InoProShop 整体切换为西门子 TIA Portal**（阶段①的成果直接被阶段②继承）。
+对外始终是 **41 个 tool + 3 个 resource** 的 MCP 服务器。
+
+### 阶段①：西门子模板风格重构（功能与对外接口完全不变）
+
+- **目录结构**：`src/` 按西门子模板风格分层编号 —— `010_Core`（类型/日志/路径工具）、
+  `020_Config`（集中配置）、`030_Infrastructure`（IPC/启动器/执行器）、`040_Services`
+  （脚本引擎/执行代理/结果解析）、`050_Server`（Server 主入口 + 按功能区的工具注册模块）、
+  `090_Scripts`（脚本资源层，原 `src/scripts/`，git mv 保留历史）。`dist/` 结构与之镜像。
+- **命名规范**：文件按西门子功能块约定加前缀 —— `FB_`（有状态块）、`FC_`（无状态函数）、
+  `T_`（类型）、`G_`（全局常量）；类名与导出 API 保持原样。
+- **配置集中化**：原先散落在 ipc / launcher / headless 各处的超时、`SCRIPT_SUCCESS`
+  协议标记、会话目录前缀等运行参数集中到 `020_Config/G_Config.ts` 参数表。
+- **单体拆分**：1955 行的 `server.ts` 拆为 `Server.ts` 主入口（对应 OB1 主组织块）+
+  `T_ToolContext` 上下文 + 6 个按功能区的注册模块（管理 4 / 工程 4 / POU 与编译 6 /
+  结构 7 / 在线运行 9 / 库与设备 11 = 41 个 tool）+ `FC_RegisterResources`（3 个 resource）。
+
+### 阶段②：执行后端切换为 TIA Portal Openness
+
+- **执行后端**：IronPython/ScriptEngine（IDE 内注入）→ **PowerShell + TIA Portal Openness**
+  （外部进程驱动）。44 个 `.py` 全部重写为 46 个 `.ps1`
+  （watcher + headless 引导 + 5 个 helper + 39 个命令脚本），全部 ASCII-only，
+  经 PowerShell Parser 全量语法校验，并纳入单测校验。
+- **watcher**：`watcher.py`（IDE 内常驻、主线程 marshal）→ `watcher.ps1`
+  （独立 powershell.exe 常驻、dot-source 执行、`$Global:TiaPortal`/`$Global:TiaProject`
+  跨命令共享状态）。**ready/terminate signal 与 commands/results 文件协议完全不变**。
+- **程序块生成**：直接 create_pou → **SCL 外部源文件**（UTF-8 BOM，支持中文）→
+  `ExternalSources.CreateFromFile` → `GenerateBlocksFromSource`
+  （反射兼容 V17/V21 两代方法名）。set_pou_code 先导出既有块 XML 保留接口，再整体重建。
+- **结构化输出协议**：`### RESULT_JSON ###` 围栏不变；PowerShell 端改用
+  JavaScriptSerializer 序列化（`ConvertTo-Json` 会把单元素数组吞成对象，破坏协议）。
+- **启动器**：`FB_CodesysLauncher` → `FB_TiaPortalLauncher`：spawn powershell watcher、
+  PublicAPI `Siemens.Engineering.dll` 自动检测、会话收养（adopt）防重复拉起；
+  **shutdown 只停 watcher，永不关闭 TIA Portal 本体**（保护用户未保存工作）。
+- **CLI**：`--codesys-path/--codesys-profile` → `--tia-exe/--tia-version`（均可省略、自动检测，
+  环境变量 `TIA_MCP_EXE`/`TIA_MCP_VERSION` 可覆盖）；`--detect` 扫描
+  `C:\Program Files\Siemens\Automation\Portal V*`（exe + PublicAPI dll 双探测）；
+  环境变量 `CODESYS_MCP_READY_TIMEOUT_MS` → `TIA_MCP_READY_TIMEOUT_MS`（默认 300s）；
+  `--kill-existing-codesys` → `--kill-existing-tia`（默认关）。
+- **工具改名**：`launch_codesys`→`launch_tia`、`shutdown_codesys`→`shutdown_tia`、
+  `get_codesys_status`→`get_tia_status`、`eval_python`→`eval_powershell`
+  （仍受 `--allow-eval` 门控）；resource URI `codesys://` → `tia://`。
+- **能力矩阵（诚实的平台边界）**：Openness 不支持的在线类工具
+  （read/write_variable、monitor_variables、get_application_state、start_stop_application、
+  add_device、list_device_repository、map_io_channel、create_method/property、
+  部分版本的 create_project_archive）改为返回**结构化诊断**（原因 + 替代方案：
+  OPC UA / snap7 / TIA UI / AML 导入），不静默失败、不伪造成功。
+- **包元数据**：`codesys-mcp-persistent` → `tia-portal-mcp`（bin 同步更名）；
+  构建拷贝 `src/090_Scripts → dist/090_Scripts` 不变；`start-mcp.cmd` 重写为
+  TIA 自动探测 + 自检路径（--version/--help/--detect 无 TIA 环境也可运行）；`.mcp.json` 同步。
+- **测试**：mock watcher 由 Python 改为 Node echo 版；新增 .ps1 全量语法/ASCII 编码校验用例；
+  vitest 改 forks 单进程池，规避宿主环境 fs shim 的 EPERM 干扰。
+
+### 验证（阶段②）
+
+- `tsc` 编译通过；`node dist/bin.js --version / --detect` 冒烟正常。
+- `npm test`：**39/39 通过**（4 个测试文件全部执行）。
+- ⚠️ **遗留**：Openness 端到端行为（挂接 TIA、SCL 生成块、编译、下载）需在装有
+  TIA Portal（V16+，含 Openness 组件）的机器上做真机验证；首次连接需在 TIA 界面
+  确认一次 Openness 防火墙框。
+
+---
+
+## 历史版本（InoProShop / CODESYS 时代）
+
+> 以下条目记录 0.7.x 时期（对接汇川 InoProShop，IronPython/ScriptEngine 后端）的工作，
+> 其中的脚本名、CLI 参数、工具名均已在本轮切换中更名，保留作决策依据与踩坑档案。
 
 ## 0.7.2
 
@@ -182,7 +256,7 @@
 2. 换行归一化 CRLF → LF；
 3. `watcher.py` 自身保持纯 ASCII（IronPython 2.7 无编码声明时拒绝非 ASCII 源码）。
 
-### 已知限制 / 交接注意事项
+### 已知限制 / 交接注意事项（0.7.0 时期，InoProShop 语境）
 
 - **仓库内 `dist/` 只有 `dist/scripts/*.py`，没有任何编译产物**，且接手时机器上
   **未安装 Node.js**。必须先装 Node ≥ 18，再 `npm install && npm run build`，
@@ -198,7 +272,7 @@
 - `set_device_parameter` 为实验性功能，很多总线参数是 GUI 专属、会报错。
 - **不要使用 `--kill-existing-codesys`**，它会强杀正在运行的 InoProShop 并丢失未保存工作。
 
-## 验证记录（0.7.0）
+## 验证记录（0.7.0，InoProShop 真机）
 
 以下均在真机 + 真实 InoProShop(V1.10.0.3) 上实测通过：
 

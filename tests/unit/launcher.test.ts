@@ -1,30 +1,14 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import * as fs from 'fs';
-import * as path from 'path';
+import { describe, it, expect } from 'vitest';
+import { TiaPortalLauncher } from '../../src/030_Infrastructure/FB_TiaPortalLauncher';
 import * as os from 'os';
-import { spawn, ChildProcess } from 'child_process';
-import { CodesysLauncher } from '../../src/launcher';
 
-// These tests use the mock watcher directly (not CODESYS)
-// They validate the launcher's IPC integration behavior
+// These tests validate launcher unit behavior without spawning the watcher.
 
-describe('CodesysLauncher', () => {
-  it('rejects launch when CODESYS exe not found', async () => {
-    const launcher = new CodesysLauncher({
-      codesysPath: 'C:\\nonexistent\\CODESYS.exe',
-      profileName: 'Test Profile',
-      workspaceDir: os.tmpdir(),
-    });
-
-    await expect(launcher.launch()).rejects.toThrow(/not found/);
-    const status = launcher.getStatus();
-    expect(status.state).toBe('error');
-  });
-
+describe('TiaPortalLauncher', () => {
   it('getStatus reports stopped initially', () => {
-    const launcher = new CodesysLauncher({
-      codesysPath: 'C:\\nonexistent\\CODESYS.exe',
-      profileName: 'Test Profile',
+    const launcher = new TiaPortalLauncher({
+      tiaExePath: '',
+      tiaVersion: '',
       workspaceDir: os.tmpdir(),
     });
 
@@ -35,9 +19,9 @@ describe('CodesysLauncher', () => {
   });
 
   it('isRunning returns false when not launched', () => {
-    const launcher = new CodesysLauncher({
-      codesysPath: 'C:\\nonexistent\\CODESYS.exe',
-      profileName: 'Test Profile',
+    const launcher = new TiaPortalLauncher({
+      tiaExePath: '',
+      tiaVersion: '',
       workspaceDir: os.tmpdir(),
     });
 
@@ -45,12 +29,22 @@ describe('CodesysLauncher', () => {
   });
 
   it('executeScript rejects when not ready', async () => {
-    const launcher = new CodesysLauncher({
-      codesysPath: 'C:\\nonexistent\\CODESYS.exe',
-      profileName: 'Test Profile',
+    const launcher = new TiaPortalLauncher({
+      tiaExePath: '',
+      tiaVersion: '',
       workspaceDir: os.tmpdir(),
     });
 
-    await expect(launcher.executeScript('print("hi")')).rejects.toThrow(/state is 'stopped'/);
+    await expect(launcher.executeScript('Write-Log "hi"')).rejects.toThrow(/state is 'stopped'/);
+  });
+
+  it('resolvePublicApiDll returns a string (empty when TIA is not installed)', () => {
+    const launcher = new TiaPortalLauncher({
+      tiaExePath: '',
+      tiaVersion: '',
+      workspaceDir: os.tmpdir(),
+    });
+
+    expect(typeof launcher.resolvePublicApiDll()).toBe('string');
   });
 });

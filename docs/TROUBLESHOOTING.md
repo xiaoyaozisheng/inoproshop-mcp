@@ -12,10 +12,10 @@
 |---|---|---|
 | `node not found on PATH`（exit 2） | 没装 Node 或不在 PATH | 装 Node.js ≥ 18，`node -v` 验证 |
 | `dist\bin.js not found`（exit 3） | 包没构建 | `npm install && npm run build`（0.7.2 起包内自带 dist，一般不会遇到） |
-| `InoProShop.exe not found at ...`（exit 2） | IDE 不在默认路径 | `start-mcp.cmd --codesys-path "C:/你的路径/InoProShop.exe"` |
-| `No *.profile found in ...`（exit 2） | 没装 IDE 或安装位置不同 | 装 IDE，或同时传 `--codesys-path` + `--codesys-profile` |
+| `TIA Portal.exe not found at ...`（exit 2） | IDE 不在默认路径 | `start-mcp.cmd --tia-exe "C:/你的路径/TIA Portal.exe"` |
+| `No *.profile found in ...`（exit 2） | 没装 IDE 或安装位置不同 | 装 IDE，或同时传 `--tia-exe` + `--tia-version` |
 
-### `[FATAL] CODESYS profile 'X' does not exist on this machine.`（exit 2）
+### `[FATAL] TIA Portal profile 'X' does not exist on this machine.`（exit 2）
 profile 名**因机器而异**（本包历史上实测过 `V1.9.0.1` 和 `V1.10.0.3` 两种）。
 处理：按报错里列出的 Available 值选一个，或 `start-mcp.cmd`（自动探测）。**永远不要抄文档里的版本号**。
 
@@ -31,7 +31,7 @@ profile 名**因机器而异**（本包历史上实测过 `V1.9.0.1` 和 `V1.10.
 
 ### `Adopting existing session: PID ...`
 **不是报错**。MCP 重启后自动接管了还活着的 IDE + watcher，无需重启 IDE。
-注意：接管的是**旧 watcher**——改过 `src/scripts/watcher.py` 后必须**手动关 IDE 再重开**才能生效。
+注意：接管的是**旧 watcher**——改过 `src/090_Scripts/watcher.ps1` 后必须**手动关 IDE 再重开**才能生效。
 
 ---
 
@@ -39,10 +39,10 @@ profile 名**因机器而异**（本包历史上实测过 `V1.9.0.1` 和 `V1.10.
 
 ### `MCP error -32602: Tool ... not found`（调 `get_project_structure` / `get_pou_code` 时）
 这俩是 **resource 不是 tool**，必须走 `resources/read`：
-`codesys://project/status`、`codesys://project/{project_path}/structure`、
-`codesys://project/{project_path}/pou/{pou_path}/code`。详见 [TOOLS.md](TOOLS.md) 第五节。
+`tia://project/status`、`tia://project/{project_path}/structure`、
+`tia://project/{project_path}/pou/{pou_path}/code`。详见 [TOOLS.md](TOOLS.md) 第五节。
 
-### `eval_python is disabled by default ...`
+### `eval_powershell is disabled by default ...`
 0.7.2 起的门控，不是坏了。启动命令加 `--allow-eval`；不开就换替代方案
 （编译取证 → `get_compile_messages`；建 ACT → IDE 手动），见 SKILL.md §0。
 
@@ -56,7 +56,7 @@ profile 名**因机器而异**（本包历史上实测过 `V1.9.0.1` 和 `V1.10.
 "没有定义标识符" 全是连带伤，别去查变量名。正确写法见 SKILL.md §5.2。
 
 ### 一写 banner 注释就炸几十条错（`符号'/' 不能识别`、`应该用';' 替换'**'`）
-CODESYS SP11 **不支持 `/* */` 块注释**（IEC 61131-3 第三版才有）。换成 `(* … *)` 或 `//`。
+TIA Portal SP11 **不支持 `/* */` 块注释**（IEC 61131-3 第三版才有）。换成 `(* … *)` 或 `//`。
 批量转换脚本见 SKILL.md §2。
 
 ### 编译结果看不懂 / 不敢信
@@ -67,7 +67,7 @@ CODESYS SP11 **不支持 `/* */` 块注释**（IEC 61131-3 第三版才有）。
 若 `get_compile_messages` 返回 0 条且无 `BUILD RESULT` 行，先 `compile_project` 一次再取。
 
 ### 中文变乱码 / `UnicodeEncodeError: 'ascii' codec ...`
-0.7.0 已修复（watcher.py 结果序列化）。若复现：说明 IDE 里跑的还是**旧 watcher**，
+0.7.0 已修复（watcher.ps1 结果序列化）。若复现：说明 IDE 里跑的还是**旧 watcher**，
 关掉 IDE 重开（`--runscript` 只在启动时载入）。
 
 ---
@@ -120,5 +120,5 @@ deviceId/deviceType 编错了会生成"语法合法但设备不匹配"的节点�
 1. `start-mcp.cmd --version`（确认包健康）；
 2. `--debug` 模式的服务端 stderr；
 3. IDE 里的消息窗口（编译类问题以 IDE 为准）；
-4. `%TEMP%\codesys-mcp-persistent\` 下对应会话目录的 `watcher.log` / `watcher_error.txt`；
-5. `%TEMP%\codesys-mcp-compile-debug.txt`（编译消息扫描的调试落盘）。
+4. `%TEMP%\tia-mcp-persistent\` 下对应会话目录的 `watcher.log` / `watcher_error.txt`；
+5. `%TEMP%\tia-portal-mcp-compile-debug.txt`（编译消息扫描的调试落盘）。

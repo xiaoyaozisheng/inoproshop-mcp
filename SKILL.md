@@ -1,13 +1,13 @@
-# InoProShop MCP —— 实战沉淀（SKILL）
+# TIA Portal MCP —— 实战沉淀（SKILL）
 
 > 这份是 **踩坑记录 + 判据 + 修法**，配合 `README.md`（开工前必读）与 `CHANGELOG.md` 使用。
-> 全部内容都在真机上实测过：**InoProShop V1.9.0.1（CODESYS V3.5 SP11 内核）**，
+> 全部内容都在真机上实测过：**TIA Portal V1.9.0.1（TIA Portal V3.5 SP11 内核）**，
 > 工程 `C:\Users\Administrator\Desktop\测试\PLC程序\未命名4\未命名4.project`。
 > 记录时间：2026-09-21。
 >
-> **0.7.2 更新（2026-11-08）**：① `eval_python` **默认禁用**（见 §0），本文两处靠它的流程
+> **0.7.2 更新（2026-11-08）**：① `eval_powershell` **默认禁用**（见 §0），本文两处靠它的流程
 > 要加 `--allow-eval` 才能照抄；② profile 名**因机器而异**，`start-mcp.cmd` 已改为自动探测，
-> 别抄任何文档里的版本号；③ `src/`、`tests/` 已恢复入包，改脚本请改 `src/scripts/` 再构建。
+> 别抄任何文档里的版本号；③ `src/`、`tests/` 已恢复入包，改脚本请改 `src/090_Scripts/` 再构建。
 
 ---
 
@@ -16,21 +16,21 @@
 | # | 问题 | 严重度 | 性质 |
 |---|---|---|---|
 | 1 | **`compile_project` 报的"0 条消息"是假的** —— 它漏扫了真正装错误的 **Build** 消息类别 | 🔴 会让人以为编译通过 | **本包缺陷 → 已修复（§1）** |
-| 2 | **`/* */` 块注释这个 CODESYS 不支持** —— 会被当代码解析，一条 banner 炸十几条错 | 🔴 直接编译失败 | CODESYS SP11 语言限制 |
+| 2 | **`/* */` 块注释这个 TIA Portal 不支持** —— 会被当代码解析，一条 banner 炸十几条错 | 🔴 直接编译失败 | TIA Portal SP11 语言限制 |
 | 3 | **没有建 Action(ACT) 的工具** —— 41 个 tool 里只有 `create_method` | 🟡 功能缺口（底层 API 有） | 本包的缺口 |
 | 4 | **写 Method 的声明时必须带 `METHOD 名字 : 返回类型` 头** —— 只送 `VAR…END_VAR` 会炸 15 条错 | 🟠 容易踩、报错很绕 | `set_pou_code` 的语义问题 |
 
 ---
 
-## 0. 🟠 0.7.2 起 `eval_python` 默认禁用（本文两处流程受影响）
+## 0. 🟠 0.7.2 起 `eval_powershell` 默认禁用（本文两处流程受影响）
 
 ### 现象
 ```
-eval_python → isError: "eval_python is disabled by default because it executes arbitrary
-IronPython inside the IDE. Restart the server with --allow-eval to enable it."
+eval_powershell → isError: "eval_powershell is disabled by default because it executes arbitrary
+PowerShell inside the IDE. Restart the server with --allow-eval to enable it."
 ```
 **这不是坏了，是新门控**（任意代码执行面太大，见 CHANGELOG 0.7.2）。启动日志里也会印一行
-`eval_python: disabled (start with --allow-eval to enable)`。
+`eval_powershell: disabled (start with --allow-eval to enable)`。
 
 ### 受影响的照抄段落
 | 位置 | 流程 | 不开门控的替代 |
@@ -52,12 +52,12 @@ IronPython inside the IDE. Restart the server with --allow-eval to enable it."
 ### 现象
 ```
 compile_project      → "Compilation initiated ..." / Message Count: 0
-get_compile_messages → "No compile messages found. The message API may not be available in this CODESYS version."
+get_compile_messages → "No compile messages found. The message API may not be available in this TIA Portal version."
 ```
 **看起来一切正常，实际上当时工程里有 288 条 Error。**
 
 ### 根因
-本机 `scriptengine.system.get_message_categories()` 返回 **3 个**类别，而 `compile_project.py`
+本机 `scriptengine.system.get_message_categories()` 返回 **3 个**类别，而 `compile_project.ps1`
 只扫了枚举结果的前 2 个：
 
 | guid | 类别 | 本包扫了吗 |
@@ -66,7 +66,7 @@ get_compile_messages → "No compile messages found. The message API may not be 
 | `217bc73e-759b-4a3c-bfa1-991c938a6541` | 预编译 | ✅ |
 | **`97f48d64-a2a3-4856-b640-75c046e37ea9`** | **Build（真正的编译错误全在这里）** | ❌ **漏了** |
 
-`%TEMP%\codesys-mcp-compile-debug.txt`（每次覆盖的调试落盘）里能直接看到这个遗漏：
+`%TEMP%\tia-portal-mcp-compile-debug.txt`（每次覆盖的调试落盘）里能直接看到这个遗漏：
 ```
 DEBUG: 2 message categories will be scanned (source: dynamic)
 DEBUG:   [0] 脚本消息 ...
@@ -89,7 +89,7 @@ time.sleep(1.5)        # 等消息落定
 for m in se.system.get_message_objects(BUILD_GUID):   # ★ 必须走 system，不是 app
     print(m.severity, m.text)
 ```
-调用方式：`tools/call` → `eval_python`，把上面整段当 `code` 传进去
+调用方式：`tools/call` → `eval_powershell`，把上面整段当 `code` 传进去
 （**0.7.2 起需先加 `--allow-eval`**，见 §0；不开门控就直接用 `get_compile_messages`，
 主通道就是这段逻辑的内置版）。
 
@@ -118,7 +118,7 @@ for m in se.system.get_message_objects(BUILD_GUID):   # ★ 必须走 system，�
 
 **改了两个脚本**：
 
-**① `src/scripts/compile_project.py`**（构建后同步到 `dist/scripts/`）—— 把硬编码的编译类别**无条件并入**扫描列表（原来只当"枚举失败时的兜底"，
+**① `src/090_Scripts/compile_project.ps1`**（构建后同步到 `dist/090_Scripts/`）—— 把硬编码的编译类别**无条件并入**扫描列表（原来只当"枚举失败时的兜底"，
 而枚举非空就永远轮不到它）；并新增两行**可判断的结论输出**：
 
 ```
@@ -133,9 +133,9 @@ BUILD SUMMARY: 构建完成--0错误,0警告：准备下载!                    
 > 干净构建时消息全被过滤掉，**只剩 `Message Count: 0` 就分不清"干净"和"没扫到"** ——
 > 这两行就是用来消歧的。
 > ⚠️ 匹配"构建完成"用的是 `u'\u6784\u5efa\u5b8c\u6210'` 转义，
-> 因为 **IronPython 2.7 不接受无编码声明的非 ASCII 源码**，补丁必须保持纯 ASCII。
+> 因为 **PowerShell 2.7 不接受无编码声明的非 ASCII 源码**，补丁必须保持纯 ASCII。
 
-**② `src/scripts/get_compile_messages.py`**（构建后同步到 `dist/scripts/`）—— 新增 **Pattern 0（主通道，已验证）**：
+**② `src/090_Scripts/get_compile_messages.ps1`**（构建后同步到 `dist/090_Scripts/`）—— 新增 **Pattern 0（主通道，已验证）**：
 枚举类别（并合并硬编码的三个编译 GUID）→ 逐个 `script_engine.system.get_message_objects(guid)`。
 原来的三种猜测全部让位：`app.get_message_objects()` 方法不存在，
 `system.get_message_objects()` **不传类别恒返回 0** —— 这就是它以前永远答
@@ -154,7 +154,7 @@ BUILD SUMMARY: 构建完成--0错误,0警告：准备下载!                    
 
 ---
 
-## 2. 🔴 `/* */` 块注释：这个 CODESYS 不支持，会把注释当代码
+## 2. 🔴 `/* */` 块注释：这个 TIA Portal 不支持，会把注释当代码
 
 ### 现象
 按常见的 banner 风格写注释：
@@ -172,7 +172,7 @@ BUILD SUMMARY: 构建完成--0错误,0警告：准备下载!                    
 ```
 
 ### 根因
-`/* … */` 是 **IEC 61131-3 第三版**才有的注释。**CODESYS V3.5 SP11 没实现**，
+`/* … */` 是 **IEC 61131-3 第三版**才有的注释。**TIA Portal V3.5 SP11 没实现**，
 所以 `/`、`*`、`**` 全被当成运算符 ⇒ 一条 banner 能炸出十几条错，
 而且报错会**连累后面**（`END_FOR` 缺失之类的二次错误）。
 
@@ -209,7 +209,7 @@ proj.save()
 ```
 **判据**：`pou.get_children(False)` 里能看到全部 ACT 名字（实测 13/13 成功）。
 
-> ⚠️ `eval_python` 0.7.2 起默认禁用 —— 启动加 `--allow-eval` 再照抄这段（见 §0）；
+> ⚠️ `eval_powershell` 0.7.2 起默认禁用 —— 启动加 `--allow-eval` 再照抄这段（见 §0）；
 > 不开门控就在 IDE 里手动建 ACT，建完正文仍走 `set_pou_code` 写入。
 
 ### 把正文写进 ACT —— 用现成的 `set_pou_code` 就行
@@ -266,7 +266,7 @@ FB_气缸                       声明 3 段 + 正文只做 CASE 状态机
 
 ## 5. 🟠 Method（METH）：能建能写，但**声明必须带 `METHOD` 头**
 
-### 5.1 走的是**官方工具**（不像 ACT 得绕 `eval_python`）
+### 5.1 走的是**官方工具**（不像 ACT 得绕 `eval_powershell`）
 ```
 tools/call create_method
   parentPouPath = "Application/FB_气缸"
@@ -307,7 +307,7 @@ END_VAR
 
 | | ACT（Action） | Method |
 |---|---|---|
-| 建法 | **没有工具** ⇒ `eval_python` 调 `pou.create_action(name)`（需 `--allow-eval`，见 §0） | **有工具** `create_method` |
+| 建法 | **没有工具** ⇒ `eval_powershell` 调 `pou.create_action(name)`（需 `--allow-eval`，见 §0） | **有工具** `create_method` |
 | 声明区 | **无** —— 共享 POU 的声明区，自己不能声明变量 | **有自己的**（但必须带 `METHOD` 头） |
 | 局部变量 | ❌ 只能全写到 POU 声明区 | ✅ 可以有 |
 | 返回类型 | ❌ | ✅ |

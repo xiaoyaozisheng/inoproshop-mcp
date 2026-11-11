@@ -16,26 +16,26 @@
    在线类工具（读/写变量、下载、启停）还需先 `connect_to_device`。
 4. **成功判据**：工具返回 `SCRIPT_SUCCESS` 才算成功；`isError: true` 时看返回文本里的
    Python 报错。
-5. **`eval_python` 默认禁用**（0.7.2 起）：调用返回明确报错，启动命令加 `--allow-eval` 才开放。
+5. **`eval_powershell` 默认禁用**（0.7.2 起）：调用返回明确报错，启动命令加 `--allow-eval` 才开放。
 
 ---
 
 ## 一、连接与状态
 
-### get_codesys_status
-当前 CODESYS 实例状态（state / PID / mode / ipcDir）。无参数。
+### get_tia_status
+当前 TIA Portal 实例状态（state / PID / mode / ipcDir）。无参数。
 未启动且未设 `--no-auto-launch` 时会**自动拉起 IDE**；已有活实例则**接管**（stderr 打印 `Adopting existing session`）。
 
-### launch_codesys
+### launch_tia
 手动拉起 IDE（`--no-auto-launch` 模式下用）。无参数。
 
-### shutdown_codesys
+### shutdown_tia
 关闭持久化的 IDE 实例。无参数。
 
-### eval_python ⚠️ 默认禁用
+### eval_powershell ⚠️ 默认禁用
 | 参数 | 类型 | 说明 |
 |---|---|---|
-| `code` | string | IronPython 2.7 源码。可用模块 `scriptengine`。**必须先 `print('SCRIPT_SUCCESS')` 再退出**，工具才报成功 |
+| `code` | string | PowerShell 2.7 源码。可用模块 `scriptengine`。**必须先 `print('SCRIPT_SUCCESS')` 再退出**，工具才报成功 |
 | `timeoutMs` | int? | 超时（默认 30000） |
 
 DEV 用：ScriptEngine API 审计、读 XML 等。勿调 IDE 的 Login（会卡主线程）。
@@ -57,12 +57,12 @@ DEV 用：ScriptEngine API 审计、读 XML 等。勿调 IDE 的 Login（会卡�
 |---|---|
 | `filePath` | 新工程要创建到的路径 |
 | `templatePath` | 可选。用磁盘上一个 `.project` 作为模板复制 |
-| `templateName` | 可选。用 CODESYS 模板管理器里注册的模板名（先用 `list_project_templates` 查） |
+| `templateName` | 可选。用 TIA Portal 模板管理器里注册的模板名（先用 `list_project_templates` 查） |
 
 默认复制内置 Standard.project。
 
 ### list_project_templates
-列出本机 CODESYS 可用的工程模板。可选参数：`extraTemplateDir`（额外扫描目录）。
+列出本机 TIA Portal 可用的工程模板。可选参数：`extraTemplateDir`（额外扫描目录）。
 
 ### save_project
 | 参数 | 说明 |
@@ -314,9 +314,9 @@ DEV 用：ScriptEngine API 审计、读 XML 等。勿调 IDE 的 Login（会卡�
 
 | URI | 说明 |
 |---|---|
-| `codesys://project/status` | 脚本引擎/工程状态（静态，不需要路径） |
-| `codesys://project/{project_path}/structure` | 工程对象树 |
-| `codesys://project/{project_path}/pou/{pou_path}/code` | 单个 POU 的声明+实现 |
+| `tia://project/status` | 脚本引擎/工程状态（静态，不需要路径） |
+| `tia://project/{project_path}/structure` | 工程对象树 |
+| `tia://project/{project_path}/pou/{pou_path}/code` | 单个 POU 的声明+实现 |
 
 `{project_path}` 传原样路径或百分号编码路径都行（0.7.0 起两种都支持）。
 
@@ -326,18 +326,18 @@ DEV 用：ScriptEngine API 审计、读 XML 等。勿调 IDE 的 Login（会卡�
 
 | 参数 | 默认 | 说明 |
 |---|---|---|
-| `-p, --codesys-path <path>` | 标准 InoProShop 安装路径 | IDE 可执行文件 |
-| `-f, --codesys-profile <profile>` | 见下 | profile 名；**传错会列出实际可用值并 exit 2** |
+| `-p, --tia-exe <path>` | 标准 TIA Portal 安装路径 | IDE 可执行文件 |
+| `-f, --tia-version <profile>` | 见下 | profile 名；**传错会列出实际可用值并 exit 2** |
 | `-w, --workspace <dir>` | 当前目录 | 相对工程路径的基准目录 |
 | `-m, --mode <mode>` | `persistent` | `persistent`（带 UI）或 `headless`（`--noUI`，回退用） |
-| `--no-auto-launch` | 关 | 启动时不自动拉 IDE（需手动开或调 `launch_codesys`） |
+| `--no-auto-launch` | 关 | 启动时不自动拉 IDE（需手动开或调 `launch_tia`） |
 | `--fallback-headless` | 开 | persistent 失败时回退 headless |
 | `--keep-alive` | 关 | 服务端停止后保留 IDE 进程 |
-| `--kill-existing-codesys` | **关，勿开** | 启动前强杀正在运行的 IDE（丢未保存工作） |
+| `--kill-existing-tia` | **关，勿开** | 启动前强杀正在运行的 IDE（丢未保存工作） |
 | `--timeout <ms>` | 60000 | 单条命令默认超时 |
 | `--verbose` / `--debug` | 关 | 日志级别 |
-| `--allow-eval` | **关** | 注册并开放 `eval_python`（0.7.2 起） |
-| `--detect` | - | 扫描本机 CODESYS 安装后退出 |
+| `--allow-eval` | **关** | 注册并开放 `eval_powershell`（0.7.2 起） |
+| `--detect` | - | 扫描本机 TIA Portal 安装后退出 |
 | `--version` / `--help` | - | 自检（无 IDE 的机器上也能跑） |
 
 `start-mcp.cmd` 内置以上默认值并**自动探测 profile**，另加四道快速失败

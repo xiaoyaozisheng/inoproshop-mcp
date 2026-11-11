@@ -1,12 +1,12 @@
-# InoProShop MCP — Programmatic Programming Interface for Inovance AM / Mid-Range PLCs
+# TIA Portal MCP — Programmatic Programming Interface for Inovance AM / Mid-Range PLCs
 
 [![CI](https://github.com/xiaoyaozisheng/inoproshop-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/xiaoyaozisheng/inoproshop-mcp/actions/workflows/ci.yml)
 
 [简体中文](README.md) | **English**
 
-A packaged MCP (Model Context Protocol) server for **programmatically reading and writing InoProShop** (Inovance AM / mid-range PLC, CoDeSys SP11 kernel) code.
+A packaged MCP (Model Context Protocol) server for **programmatically reading and writing TIA Portal** (Inovance AM / mid-range PLC, CoDeSys SP11 kernel) code.
 
-> 📌 Also read [`SKILL.md`](SKILL.md): hard-won field notes (compile-message scanning misses the Build category / `/* */` comments are unsupported / how ACT and Method differ / `eval_python` disabled by default) — **read it together with this file before you start**; every one of those pitfalls will fool you into thinking "everything is fine".
+> 📌 Also read [`SKILL.md`](SKILL.md): hard-won field notes (compile-message scanning misses the Build category / `/* */` comments are unsupported / how ACT and Method differ / `eval_powershell` disabled by default) — **read it together with this file before you start**; every one of those pitfalls will fool you into thinking "everything is fine".
 >
 > 🌐 **Note on languages**: only this README is bilingual. [`SKILL.md`](SKILL.md), [docs/TOOLS.md](docs/TOOLS.md), [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [CHANGELOG.md](CHANGELOG.md) are currently Chinese-only.
 
@@ -32,13 +32,13 @@ A packaged MCP (Model Context Protocol) server for **programmatically reading an
 The value **differs per machine / per IDE version**. A wrong value means `--profile` doesn't match, the IDE won't start, or instance adoption fails. **Always list the directory and take the actual value**:
 
 ```powershell
-Get-ChildItem 'C:\Inovance Control\InoProShop\CODESYS\Profiles' -Filter *.profile |
+Get-ChildItem 'C:\Inovance Control\TIA Portal\TIA Portal\Profiles' -Filter *.profile |
     Select-Object -ExpandProperty Name
 ```
 
-> Earlier versions of this doc said `InoProShop(V1.9.0.1)` — on one machine that was **measured wrong**,
-> the actual value there was **`InoProShop(V1.10.0.3)`** (that directory also had `CODESYS V3.5 SP11 Patch 1.profile`).
-> On yet another machine the directory contained **only** `InoProShop(V1.9.0.1).profile`, and a full
+> Earlier versions of this doc said `TIA Portal(V1.9.0.1)` — on one machine that was **measured wrong**,
+> the actual value there was **`TIA Portal(V1.10.0.3)`** (that directory also had `TIA Portal V3.5 SP11 Patch 1.profile`).
+> On yet another machine the directory contained **only** `TIA Portal(V1.9.0.1).profile`, and a full
 > closed loop was verified with it (launch IDE → open project → create GVL → edit POU → save → shutdown).
 > **Wherever a version number appears in any doc, the Profiles directory wins. Never copy-paste.**
 >
@@ -52,13 +52,13 @@ Plenty of machines have no Node at all (the machine this package was first adopt
 ```bash
 cd <package directory>
 npm install
-npm run build        # tsc compile + copy src/scripts -> dist/scripts
+npm run build        # tsc compile + copy src/090_Scripts -> dist/090_Scripts
 npm test             # 39 cases (unit + script-template integration); run after touching src/
 ```
 
-**3. If you change `src/scripts/watcher.py`, you must restart InoProShop for it to take effect.**
+**3. If you change `src/090_Scripts/watcher.ps1`, you must restart TIA Portal for it to take effect.**
 
-watcher.py is loaded by the IDE at startup via `--runscript`; replacing the file while running does not reload it.
+watcher.ps1 is loaded by the IDE at startup via `--runscript`; replacing the file while running does not reload it.
 
 **4. `get_project_structure` and `get_pou_code` are resources, not tools.**
 
@@ -66,9 +66,9 @@ Calling them via `tools/call` fails outright with `MCP error -32602: Tool ... no
 
 | Resource URI | Description |
 |---|---|
-| `codesys://project/status` | Script engine / project status (static, no path needed) |
-| `codesys://project/{project_path}/structure` | Project object tree |
-| `codesys://project/{project_path}/pou/{pou_path}/code` | One POU's declaration + implementation |
+| `tia://project/status` | Script engine / project status (static, no path needed) |
+| `tia://project/{project_path}/structure` | Project object tree |
+| `tia://project/{project_path}/pou/{pou_path}/code` | One POU's declaration + implementation |
 
 `{project_path}` accepts a **raw path** or a **percent-encoded path** (both supported since 0.7.0).
 Note both resources go through `require_project_open`, which **refuses to implicitly switch projects** —
@@ -125,7 +125,7 @@ process on demand and speaks JSON-RPC over stdin/stdout. So:
   start-mcp.cmd --no-auto-launch < req.jsonl
   ```
 
-Without `--no-auto-launch`, the server **auto-launches InoProShop** on startup; if a live instance
+Without `--no-auto-launch`, the server **auto-launches TIA Portal** on startup; if a live instance
 already exists it **adopts** it (stderr shows `Adopting existing session`) instead of launching a second copy.
 
 The launcher has four built-in fast-fails to avoid "mysteriously hanging":
@@ -134,8 +134,8 @@ The launcher has four built-in fast-fails to avoid "mysteriously hanging":
 |---|---|
 | `node` not found | Tells you to install Node ≥ 18, `exit 2` |
 | `dist/bin.js` missing | Tells you to run `npm run build`, `exit 3` |
-| `InoProShop.exe` missing | Tells you to pass `--codesys-path` with the real location, `exit 2` |
-| No `*.profile` in the Profiles directory | Tells you to install or pass `--codesys-profile` explicitly, `exit 2` |
+| `TIA Portal.exe` missing | Tells you to pass `--tia-exe` with the real location, `exit 2` |
+| No `*.profile` in the Profiles directory | Tells you to install or pass `--tia-version` explicitly, `exit 2` |
 
 > One more safety net: even bypassing the launcher and running `node dist/bin.js` directly with a wrong
 > profile, `bin.js` validates at startup (`assertProfileExists`), lists the actually available values and `exit 2`.
@@ -154,32 +154,32 @@ But first verify the environment per items 1 and 2 above before doing anything e
 ## I. What This Is
 
 - Adapted from [luke-harriman/Codesys-MCP](https://github.com/luke-harriman/Codesys-MCP), persistent mode.
-- Reads and writes projects through InoProShop's ScriptEngine (IronPython 2.7).
+- Reads and writes projects through TIA Portal's ScriptEngine (PowerShell 2.7).
 - **The UI stays interactive**: a background thread polls for commands, the main thread executes them;
   the IDE does not freeze while a script runs.
-- **Automatic adoption**: after the MCP server restarts it adopts the running InoProShop instance;
+- **Automatic adoption**: after the MCP server restarts it adopts the running TIA Portal instance;
   no IDE restart needed.
 - **Chinese-text patches applied**: Chinese paths, comments and variable names all work (see section VI).
 - **Source and tests shipped** (0.7.2): complete `src/` + `tests/`, `npm test` runs 39 cases;
-  `eval_python` is disabled by default (enable with `--allow-eval`).
+  `eval_powershell` is disabled by default (enable with `--allow-eval`).
 
 ## II. Requirements
 
 - Windows 10/11
 - Node.js >= 18
-- InoProShop installed (default path below)
+- TIA Portal installed (default path below)
 
 ## III. Direct Launch
 
 ```bash
 node dist/bin.js \
-  --codesys-path "C:/Inovance Control/InoProShop/CODESYS/Common/InoProShop.exe" \
-  --codesys-profile "InoProShop(V1.9.0.1)" \
+  --tia-exe "C:/Inovance Control/TIA Portal/TIA Portal/Common/TIA Portal.exe" \
+  --tia-version "TIA Portal(V1.9.0.1)" \
   --mode persistent \
   --no-auto-launch
 ```
 
-> The `--codesys-profile` value **differs per machine** (measured on two machines in this package's
+> The `--tia-version` value **differs per machine** (measured on two machines in this package's
 > history: `V1.9.0.1` on one, `V1.10.0.3` on the other) — always go by the Profiles directory (section VII).
 > The easier route is the root `start-mcp.cmd` — since 0.7.2 it **auto-detects** the profile.
 
@@ -203,9 +203,9 @@ fast-fails are built into the launcher; when copying to another machine **only t
 ```
 
 (A ready-made `.mcp.json` ships in this folder — copy it and adjust the single `start-mcp.cmd` path.
-Note: `--no-auto-launch` means InoProShop is not opened automatically at server start — **open
-InoProShop manually before writing code** (or call the `launch_codesys` tool). Append `"--allow-eval"`
-to enable `eval_python`.)
+Note: `--no-auto-launch` means TIA Portal is not opened automatically at server start — **open
+TIA Portal manually before writing code** (or call the `launch_tia` tool). Append `"--allow-eval"`
+to enable `eval_powershell`.)
 
 ## V. Core Workflow for Writing Code
 
@@ -213,7 +213,7 @@ Call these tools in order to complete "open project → create POU → write cod
 
 | Step | Tool | Key parameters |
 |---|---|---|
-| 1. Check status | `get_codesys_status` | none (auto-launches / adopts InoProShop) |
+| 1. Check status | `get_tia_status` | none (auto-launches / adopts TIA Portal) |
 | 2. Open project | `open_project` | `filePath`: project file path, e.g. `C:/xxx/xxx.project` |
 | 3. Create POU | `create_pou` | `projectFilePath`, `name`, `type` (`Program`/`FunctionBlock`/`Function`), `language` (`ST` etc.), `parentPath` (usually `Application`) |
 | 4. Write code | `set_pou_code` | `projectFilePath`, `pouPath` (e.g. `Application/MyPOU`), `declarationCode`, `implementationCode` |
@@ -248,46 +248,46 @@ Call these tools in order to complete "open project → create POU → write cod
 
 ## VI. CJK / Chinese Support (patched)
 
-The original project crashes on Chinese text under IronPython 2.7 (`UnicodeDecodeError`); this package
-fixes it. The patches are all in `src/scripts/watcher.py`:
+The original project crashes on Chinese text under PowerShell 2.7 (`UnicodeDecodeError`); this package
+fixes it. The patches are all in `src/090_Scripts/watcher.ps1`:
 
 1. Command scripts are read as UTF-8: `open(path, "rb").read().decode('utf-8')` (previously defaulted to ASCII).
 2. Line endings normalized: CRLF → LF (binary reads skip Python 2's universal-newline translation).
-3. watcher.py itself stays pure ASCII (without an encoding declaration IronPython 2.7 rejects non-ASCII source).
-4. **Result reporting no longer uses `json.dumps()`'s default `ensure_ascii=True`.** IronPython 2.7's
+3. watcher.ps1 itself stays pure ASCII (without an encoding declaration PowerShell 2.7 rejects non-ASCII source).
+4. **Result reporting no longer uses `json.dumps()`'s default `ensure_ascii=True`.** PowerShell 2.7's
    `py_encode_basestring_ascii` calls `s.decode('utf-8')` **again on strings that are already unicode**;
    any Chinese in the output throws `UnicodeEncodeError`
    (`'ascii' codec can't decode byte ... in position N`). The failure is insidious: the result file is
    never written → the command file is never cleaned up → the watcher retries the same command every
    second, burning the IDE's CPU. Now fixed with `ensure_ascii=False`, and the `OutputCapture` buffer
-   is unified to true unicode. Note that in IronPython `isinstance(x, unicode)` returns `True` for
+   is unified to true unicode. Note that in PowerShell `isinstance(x, unicode)` returns `True` for
    **every** string (byte-flavored ones too), so they can only be told apart **by content**: strings
    containing chars > 255 are true unicode and need `encode('utf-8')`; strings that are all < 256 are
-   a latin-1 view of UTF-8 bytes and need `decode('utf-8')`. `_text_utils.py`'s `emit_result()` already
+   a latin-1 view of UTF-8 bytes and need `decode('utf-8')`. `_text_utils.ps1`'s `emit_result()` already
    used `ensure_ascii=False`; only the watcher's own result envelope was missing it.
 5. When the watcher crashes handling a single command it now writes back a failure result and
    **deletes the command file** instead of retrying forever.
 
 **Bottom line: Chinese in project paths, comments, variable names and string literals all works.**
 
-> Note: watcher.py is loaded by the IDE at startup via `--runscript`; **changing it requires restarting
-> InoProShop to take effect**.
+> Note: watcher.ps1 is loaded by the IDE at startup via `--runscript`; **changing it requires restarting
+> TIA Portal to take effect**.
 
 ## VII. Critical Configuration Values (Get These Right)
 
-- Executable: `C:/Inovance Control/InoProShop/CODESYS/Common/InoProShop.exe`
-  (override with `--codesys-path` for custom install locations; `start-mcp.cmd` exits with an error if the exe is absent.)
+- Executable: `C:/Inovance Control/TIA Portal/TIA Portal/Common/TIA Portal.exe`
+  (override with `--tia-exe` for custom install locations; `start-mcp.cmd` exits with an error if the exe is absent.)
 - Profile: **differs per machine / per IDE version — two values have been measured in this package's
-  history**: one machine had only `InoProShop(V1.9.0.1)`, the other only `InoProShop(V1.10.0.3)`.
+  history**: one machine had only `TIA Portal(V1.9.0.1)`, the other only `TIA Portal(V1.10.0.3)`.
   **The Profiles directory is always the source of truth, not any doc:**
 
   ```powershell
-  Get-ChildItem 'C:\Inovance Control\InoProShop\CODESYS\Profiles' -Filter *.profile |
+  Get-ChildItem 'C:\Inovance Control\TIA Portal\TIA Portal\Profiles' -Filter *.profile |
       Select-Object -ExpandProperty Name
   ```
 
-  - `start-mcp.cmd` (since 0.7.2) **auto-detects**: prefers `InoProShop*.profile`, else the first
-    `*.profile`; to pin one, append `--codesys-profile "<name>"`.
+  - `start-mcp.cmd` (since 0.7.2) **auto-detects**: prefers `TIA Portal*.profile`, else the first
+    `*.profile`; to pin one, append `--tia-version "<name>"`.
   - Even a directly-passed wrong profile cannot "mysteriously hang" — `dist/bin.js` validates at
     startup (`assertProfileExists`) and exits 2 listing the actually available values.
 
@@ -302,17 +302,17 @@ fixes it. The patches are all in `src/scripts/watcher.py`:
 
 **Online / runtime**: `connect_to_device` `disconnect_from_device` `download_to_device` `set_credentials` `set_simulation_mode` `get_application_state` `read_variable` `write_variable` `start_stop_application` `monitor_variables`
 
-**Other**: `get_codesys_status` `launch_codesys` `shutdown_codesys` `eval_python`
+**Other**: `get_tia_status` `launch_tia` `shutdown_tia` `eval_powershell`
 
-> `eval_python` can execute arbitrary IronPython (ScriptEngine API audits / XML reading etc.), for DEV
+> `eval_powershell` can execute arbitrary PowerShell (ScriptEngine API audits / XML reading etc.), for DEV
 > use; don't call the IDE's Login from it (blocks the main thread).
 > **Disabled by default since 0.7.2** (arbitrary code execution is too large a surface): calls return an
 > explicit error; add `--allow-eval` to the launch command if you need it.
 
 ## IX. Operational Notes
 
-1. **Do not use `--kill-existing-codesys`** (force-kills a running InoProShop, losing unsaved work). Off by default.
-2. An MCP restart automatically adopts the live instance; to load new patches, close InoProShop manually first.
+1. **Do not use `--kill-existing-tia`** (force-kills a running TIA Portal, losing unsaved work). Off by default.
+2. An MCP restart automatically adopts the live instance; to load new patches, close TIA Portal manually first.
 3. `set_device_parameter` is experimental; many bus parameters are GUI-only and error out. Building a
    complete ECAT axis is best done manually in the IDE.
 4. After writing code remember to `compile_project`; results appear in the IDE's message view.
@@ -323,6 +323,6 @@ fixes it. The patches are all in `src/scripts/watcher.py`:
 
 ```bash
 npm install
-npm run build   # tsc compile + copy src/scripts -> dist/scripts
+npm run build   # tsc compile + copy src/090_Scripts -> dist/090_Scripts
 npm test        # 39 cases (vitest): 3 unit test files + 1 script-template integration suite
 ```

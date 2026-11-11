@@ -1,10 +1,10 @@
 {
-  "name": "codesys-mcp-persistent",
+  "name": "tia-portal-mcp",
   "version": "0.7.2",
-  "description": "MCP server for InoProShop (Inovance AM / CoDeSys SP11) with persistent UI instance and file-based IPC",
+  "description": "MCP server for Siemens TIA Portal (Openness API) with persistent watcher and file-based IPC",
   "main": "dist/server.js",
   "bin": {
-    "codesys-mcp-persistent": "dist/bin.js"
+    "tia-portal-mcp": "dist/bin.js"
   },
   "files": [
     "dist/",
@@ -13,19 +13,19 @@
   ],
   "scripts": {
     "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
-    "build": "npm run clean && tsc && node -e \"require('fs').cpSync('src/scripts','dist/scripts',{recursive:true})\"",
+    "build": "npm run clean && tsc && node -e \"require('fs').cpSync('src/090_Scripts','dist/090_Scripts',{recursive:true})\"",
     "test": "vitest --run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "npm run build && npm test"
   },
   "keywords": [
-    "codesys",
+    "tia-portal",
+    "siemens",
+    "openness",
     "mcp",
     "plc",
-    "automation",
-    "persistent",
-    "ui"
+    "automation"
   ],
   "author": "luke-harriman",
   "repository": {
